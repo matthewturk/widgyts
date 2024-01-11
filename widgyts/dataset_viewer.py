@@ -103,7 +103,7 @@ class DomainViewer(DatasetViewerComponent):
         )
         camera = pythreejs.PerspectiveCamera(
             position=right,
-            fov=20,
+            fov=45,
             children=[pythreejs.AmbientLight()],
             near=1e-2,
             far=2e3,
@@ -112,7 +112,7 @@ class DomainViewer(DatasetViewerComponent):
         for c in self.domain_view_components:
             children.extend(c.view)
         scene = pythreejs.Scene(children=children)
-        orbit_control = pythreejs.OrbitControls(controlling=camera)
+        orbit_control = pythreejs.OrbitControls(controlling=camera, enablePan=False)
         renderer = pythreejs.Renderer(
             scene=scene,
             camera=camera,
@@ -159,7 +159,6 @@ class DomainViewComponent(traitlets.HasTraits):
     parent = traitlets.Instance(DomainViewer)
     display_name = "Unknown"
 
-
 class CameraPathView(DomainViewComponent):
     display_name = "Camera"
     position_list = traitlets.List([])
@@ -175,14 +174,21 @@ class CameraPathView(DomainViewComponent):
 
         camera_action_box = ipywidgets.Box([])
 
+        play_button = ipywidgets.Play(
+            min = 0.0,
+            max = 10.0,
+            step = 0.01,
+            value = 0,
+            description = "Press Play"
+        )
         def _mirror_positions():
             select.options = [
                 (f"Position {i}", p) for i, p in enumerate(self.position_list)
             ]
             # Update our animation mixer tracks as well
             times = np.mgrid[0.0 : 10.0 : len(self.position_list) * 1j].astype("f4")
-            if len(camera_action_box.children) > 0:
-                camera_action_box.children[0].stop()
+            #if len(camera_action_box.children) > 0:
+            #    play_button.playing = False
             camera_clip = pythreejs.AnimationClip(
                 tracks=[
                     pythreejs.QuaternionKeyframeTrack(
@@ -202,12 +208,24 @@ class CameraPathView(DomainViewComponent):
                     ),
                 ]
             )
+            animation_action = pythreejs.AnimationAction(
+                pythreejs.AnimationMixer(self.parent.renderer.camera),
+                camera_clip,
+                self.parent.renderer.camera)
+            def _playing_change(event):
+                if event["new"] == True:
+                    animation_action.play()
+                else:
+                    animation_action.pause()
+                self.parent.renderer.controls[0].enabled = not play_button.playing
+            def _value_change(event):
+                if not play_button.playing and event["new"] == play_button.min:
+                    animation_action.stop()
+            play_button.unobserve_all()
+            play_button.observe(_playing_change, ["playing"])
+            play_button.observe(_value_change, ["value"])
             camera_action_box.children = [
-                pythreejs.AnimationAction(
-                    pythreejs.AnimationMixer(self.parent.renderer.camera),
-                    camera_clip,
-                    self.parent.renderer.camera,
-                )
+                play_button
             ]
 
         def on_button_add_clicked(b):
@@ -216,6 +234,7 @@ class CameraPathView(DomainViewComponent):
             self.position_list = self.position_list + [
                 {attr: state[attr] for attr in ("position", "quaternion", "scale")}
             ]
+            self.position_list[-1]["target"] = self.parent.renderer.controls[0].target
             _mirror_positions()
 
         button_add.on_click(on_button_add_clicked)

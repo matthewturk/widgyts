@@ -73,7 +73,7 @@
     "jupyter-threejs": "^2.3.0"
   },
   "devDependencies": {
-    "@jupyterlab/builder": "^3.0.0",
+    "@jupyterlab/builder": "^4.0.0",
     "@phosphor/application": "^1.6.0",
     "@phosphor/widgets": "^1.6.0",
     "@types/expect.js": "^0.3.29",
